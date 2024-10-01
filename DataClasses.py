@@ -1,6 +1,10 @@
 import sys
 import numpy as np
 import pandas as pd
+import tensorflow as tf
+from keras.models import Sequential
+from keras.layers import Conv1D, MaxPooling1D, Flatten, Dense
+from sklearn.model_selection import train_test_split
 
 from dataclasses import dataclass
 
@@ -25,13 +29,10 @@ class Sample:
         occupancies: list[int]
         cdiffs: list[int]
         anyCps: list[int]
-        )
 
 
-import tensorflow as tf
-from keras.models import Sequential
-from keras.layers import Conv1D, MaxPooling1D, Flatten, Dense
-from sklearn.model_selection import train_test_split
+
+
 
 def split_sequences(sequences, n_steps):
     retlist=list()
@@ -46,7 +47,7 @@ def split_sequences(sequences, n_steps):
 
 def get_samples(run, n_steps):
     for seq in [run.counts, run.cdffs, run.occupancies, run.anyCps]:
-
+        pass
 
 
 data = pd.read_csv("./data/sim_data.csv", index_col=["run"]).sort_index()
@@ -65,7 +66,7 @@ for run in data.index.unique():
     runs.append(r)
 
 for r in runs:
-
+    pass
 
 sys.exit(0)
 
