@@ -16,6 +16,7 @@ The goal is to train a machine learning model to predict `decayRate` and `surfac
 - `generate_training_data.py` - Main script to convert `sim_data.csv` into ML training format
 - `test_training_data.py` - Validation script to ensure correct dataset format
 - `demo_ml_usage.py` - Demonstration of how to use the training data for ML
+- `predict_observed_data.py` - Script to predict parameters for observed data using trained model
 
 ### Data Files
 - `data/sim_data.csv` - Raw simulation data (21 runs, 276 time steps each)
@@ -46,6 +47,17 @@ python test_training_data.py
 ```bash
 python demo_ml_usage.py
 ```
+
+### Predict Parameters for Observed Data
+```bash
+python predict_observed_data.py
+```
+
+This script:
+- Trains a neural network model on the simulation data
+- Processes the observed data into the correct input format
+- Predicts `decayRate` and `surfaceTransferFraction` for the observed data
+- Displays the predictions with validation information
 
 ## Dataset Format
 
