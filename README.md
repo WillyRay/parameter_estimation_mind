@@ -70,10 +70,12 @@ The dataset is designed for multi-output regression where:
 - **Input (X)**: 224 time series features (4 variables × 56 days)
 - **Output (y)**: 2 target parameters (`decayRate`, `surfaceTransferFraction`)
 
-Example:
+Example using PyTorch:
 ```python
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 
 # Load data
 df = pd.read_csv('data/training_data.csv')
@@ -83,7 +85,28 @@ feature_cols = [col for col in df.columns if any(var in col for var in ['count_'
 X = df[feature_cols].values
 y = df[['decayRate', 'surfaceTransferFraction']].values
 
+# Convert to PyTorch tensors
+X_tensor = torch.FloatTensor(X)
+y_tensor = torch.FloatTensor(y)
+
+# Create neural network
+model = nn.Sequential(
+    nn.Linear(224, 512),
+    nn.ReLU(),
+    nn.BatchNorm1d(512),
+    nn.Dropout(0.2),
+    nn.Linear(512, 256),
+    nn.ReLU(),
+    nn.BatchNorm1d(256),
+    nn.Dropout(0.2),
+    nn.Linear(256, 128),
+    nn.ReLU(),
+    nn.BatchNorm1d(128),
+    nn.Dropout(0.2),
+    nn.Linear(128, 2)
+)
+
 # Train model
-model = RandomForestRegressor()
-model.fit(X, y)
+criterion = nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 ```
