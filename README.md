@@ -1,0 +1,89 @@
+# Parameter Estimation Training Dataset
+
+This repository contains scripts to process simulation data for machine learning-based parameter estimation.
+
+## Overview
+
+The goal is to train a machine learning model to predict `decayRate` and `surfaceTransferFraction` parameters based on 56-day time series data from 4 variables:
+- `count`
+- `CDIFF` 
+- `occupancy`
+- `anyCP`
+
+## Files
+
+### Data Processing
+- `generate_training_data.py` - Main script to convert `sim_data.csv` into ML training format
+- `test_training_data.py` - Validation script to ensure correct dataset format
+- `demo_ml_usage.py` - Demonstration of how to use the training data for ML
+
+### Data Files
+- `data/sim_data.csv` - Raw simulation data (21 runs, 276 time steps each)
+- `data/observed_data.csv` - Observed data (56 days) used as target length
+- `data/training_data.csv` - Processed training dataset (generated)
+
+### Utilities
+- `DataClasses.py` - Data class definitions for runs and samples
+
+## Usage
+
+### Generate Training Dataset
+```bash
+python generate_training_data.py
+```
+
+This creates `data/training_data.csv` with:
+- 4,641 training samples (221 sequences × 21 runs)
+- Each row represents one 56-day sequence
+- Columns: `run`, `start_day`, `decayRate`, `surfaceTransferFraction`, plus 224 time series features
+
+### Validate Dataset
+```bash
+python test_training_data.py
+```
+
+### Run ML Demo
+```bash
+python demo_ml_usage.py
+```
+
+## Dataset Format
+
+The training dataset has the following structure:
+
+| Column | Description |
+|--------|-------------|
+| `run` | Simulation run ID |
+| `start_day` | Starting day of the 56-day sequence |
+| `decayRate` | Target parameter 1 |
+| `surfaceTransferFraction` | Target parameter 2 |
+| `count_0` to `count_55` | Count time series (56 values) |
+| `CDIFF_0` to `CDIFF_55` | CDIFF time series (56 values) |
+| `occupancy_0` to `occupancy_55` | Occupancy time series (56 values) |
+| `anyCP_0` to `anyCP_55` | AnyCP time series (56 values) |
+
+Total: 228 columns (4 metadata + 224 features)
+
+## Machine Learning Usage
+
+The dataset is designed for multi-output regression where:
+- **Input (X)**: 224 time series features (4 variables × 56 days)
+- **Output (y)**: 2 target parameters (`decayRate`, `surfaceTransferFraction`)
+
+Example:
+```python
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+
+# Load data
+df = pd.read_csv('data/training_data.csv')
+
+# Prepare features and targets
+feature_cols = [col for col in df.columns if any(var in col for var in ['count_', 'CDIFF_', 'occupancy_', 'anyCP_'])]
+X = df[feature_cols].values
+y = df[['decayRate', 'surfaceTransferFraction']].values
+
+# Train model
+model = RandomForestRegressor()
+model.fit(X, y)
+```
