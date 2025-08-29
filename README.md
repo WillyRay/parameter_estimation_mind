@@ -2,6 +2,10 @@
 
 This repository contains scripts to process simulation data for machine learning-based parameter estimation.
 
+## Contributors
+
+- **Data Reshaping Scripts**: GitHub Copilot created the first version of the data reshaping utilities (`reshape_sim_data.py`, `verify_reshaped_data.py`, `access_reshaped_data.py`)
+
 ## Overview
 
 The goal is to train a machine learning model to predict `decayRate` and `surfaceTransferFraction` parameters based on 56-day time series data from 4 variables:
@@ -17,6 +21,9 @@ The goal is to train a machine learning model to predict `decayRate` and `surfac
 - `test_training_data.py` - Validation script to ensure correct dataset format
 - `demo_ml_usage.py` - Demonstration of how to use the training data for ML
 - `predict_observed_data.py` - Script to predict parameters for observed data using trained model
+- `reshape_sim_data.py` - Script to reshape sim_data.csv into grouped time series format (Created by GitHub Copilot)
+- `verify_reshaped_data.py` - Verification and analysis of reshaped data (Created by GitHub Copilot)
+- `access_reshaped_data.py` - Example showing how to access reshaped data (Created by GitHub Copilot)
 
 ### Data Files
 - `data/sim_data.csv` - Raw simulation data (21 runs, 276 time steps each)
