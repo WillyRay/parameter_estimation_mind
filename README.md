@@ -25,6 +25,11 @@ The goal is to train a machine learning model to predict `decayRate` and `surfac
 - `verify_reshaped_data.py` - Verification and analysis of reshaped data (Created by GitHub Copilot)
 - `access_reshaped_data.py` - Example showing how to access reshaped data (Created by GitHub Copilot)
 
+### 4x56 CNN Implementation
+- `cnn_4x56_model.py` - Convolutional Neural Network implementation for 4x56 time series arrays
+- `test_cnn_4x56.py` - Comprehensive test suite for the CNN implementation  
+- `compare_approaches.py` - Side-by-side comparison of flattened vs CNN approaches
+
 ### Data Files
 - `data/sim_data.csv` - Raw simulation data (21 runs, 276 time steps each)
 - `data/observed_data.csv` - Observed data (56 days) used as target length
@@ -50,9 +55,24 @@ This creates `data/training_data.csv` with:
 python test_training_data.py
 ```
 
-### Run ML Demo
+### Run ML Demo (Flattened Approach)
 ```bash
 python demo_ml_usage.py
+```
+
+### Run CNN Demo (4x56 Arrays)
+```bash
+python cnn_4x56_model.py
+```
+
+### Compare Both Approaches
+```bash
+python compare_approaches.py
+```
+
+### Test CNN Implementation
+```bash
+python test_cnn_4x56.py
 ```
 
 ### Predict Parameters for Observed Data
@@ -83,13 +103,70 @@ The training dataset has the following structure:
 
 Total: 228 columns (4 metadata + 224 features)
 
+## Machine Learning Approaches
+
+This repository now offers two distinct approaches for training models:
+
+### Approach 1: Flattened Features (Original)
+
+Uses traditional machine learning with flattened time series:
+- **Data format**: 224 features per sample (4 variables × 56 days)
+- **Model types**: Random Forest, SVM, Neural Networks with dense layers
+- **Benefits**: Simple, interpretable, works with traditional ML algorithms
+- **Use case**: When temporal structure is less important
+
+Example:
+```python
+# Each sample is a flat vector: [count_0, count_1, ..., count_55, CDIFF_0, ...]
+X_flat = data.reshape(num_samples, 224)
+```
+
+### Approach 2: 4x56 CNN Arrays (New)
+
+Uses convolutional neural networks with structured arrays:
+- **Data format**: 4×56 arrays per sample (variables × time)
+- **Model types**: Convolutional Neural Networks (CNN)
+- **Benefits**: Preserves temporal structure, captures spatial relationships
+- **Use case**: When chronological dependencies are important
+
+Example:
+```python
+# Each sample is a 4×56 array preserving structure:
+# Row 0: count time series [days 100-155]
+# Row 1: CDIFF time series [days 100-155]  
+# Row 2: occupancy time series [days 100-155]
+# Row 3: anyCP time series [days 100-155]
+X_4x56 = data.reshape(num_samples, 4, 56, 1)  # Add channel dimension for CNN
+```
+
+### CNN Architecture
+
+The 4x56 CNN implementation includes:
+- Conv2D layers to capture spatial patterns between variables
+- MaxPooling along time dimension 
+- BatchNormalization for stable training
+- Dropout for regularization
+- Dense layers for final regression
+
+```python
+model = Sequential([
+    Conv2D(32, (2, 3), activation='relu', input_shape=(4, 56, 1)),
+    BatchNormalization(),
+    MaxPooling2D((1, 2)),  # Pool along time dimension
+    # ... additional layers
+    Dense(2)  # Output: decayRate, surfaceTransferFraction
+])
+```
+
 ## Machine Learning Usage
 
 The dataset is designed for multi-output regression where:
-- **Input (X)**: 224 time series features (4 variables × 56 days)
+- **Input (X)**: Time series data in two formats:
+  - Flattened: 224 features (4 variables × 56 days)  
+  - Structured: 4×56 arrays (variables × time)
 - **Output (y)**: 2 target parameters (`decayRate`, `surfaceTransferFraction`)
 
-Example using PyTorch:
+### Example using PyTorch (Flattened approach):
 ```python
 import pandas as pd
 import torch
