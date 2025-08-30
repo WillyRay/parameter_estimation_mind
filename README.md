@@ -121,32 +121,43 @@ Example:
 X_flat = data.reshape(num_samples, 224)
 ```
 
-### Approach 2: 4x56 CNN Arrays (New)
+### Approach 2: 4x56 CNN Arrays with Sliding Windows (New)
 
-Uses convolutional neural networks with structured arrays:
+Uses convolutional neural networks with structured arrays and sliding window approach:
 - **Data format**: 4×56 arrays per sample (variables × time)
+- **Sliding windows**: Multiple 56-day sequences per run (100-155, 101-156, 102-157, etc.)
+- **Training samples**: ~4,400 windows from 21 runs (211 windows per run)
 - **Model types**: Convolutional Neural Networks (CNN)
-- **Benefits**: Preserves temporal structure, captures spatial relationships
-- **Use case**: When chronological dependencies are important
+- **Benefits**: Preserves temporal structure, captures spatial relationships, much more training data
+- **Use case**: When chronological dependencies are important and more training examples are needed
 
 Example:
 ```python
 # Each sample is a 4×56 array preserving structure:
-# Row 0: count time series [days 100-155]
-# Row 1: CDIFF time series [days 100-155]  
-# Row 2: occupancy time series [days 100-155]
-# Row 3: anyCP time series [days 100-155]
-X_4x56 = data.reshape(num_samples, 4, 56, 1)  # Add channel dimension for CNN
+# Row 0: count time series [56 consecutive days]
+# Row 1: CDIFF time series [56 consecutive days]  
+# Row 2: occupancy time series [56 consecutive days]
+# Row 3: anyCP time series [56 consecutive days]
+
+# Multiple sliding windows per run:
+# Window 1: days 100-155
+# Window 2: days 101-156  
+# Window 3: days 102-157
+# ... and so on
+X_4x56 = data.reshape(num_windows, 4, 56, 1)  # Add channel dimension for CNN
 ```
 
 ### CNN Architecture
 
 The 4x56 CNN implementation includes:
+- **Sliding Window Data Generation**: Creates ~4,400 training examples from 21 runs
 - Conv2D layers to capture spatial patterns between variables
-- MaxPooling along time dimension 
+- MaxPooling along time dimension to reduce dimensionality
 - BatchNormalization for stable training
 - Dropout for regularization
-- Dense layers for final regression
+- Dense layers for final regression to 2 target parameters
+
+Key advantage: The sliding window approach provides much more training data by creating multiple overlapping 56-day sequences from each simulation run, significantly improving model training compared to using only one sequence per run.
 
 ```python
 model = Sequential([
@@ -205,4 +216,48 @@ model = nn.Sequential(
 # Train model
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+```
+
+### Example using TensorFlow/Keras (4x56 CNN with Sliding Windows):
+```python
+from cnn_4x56_model import load_and_prepare_4x56_data, create_cnn_model
+from sklearn.model_selection import train_test_split
+import numpy as np
+
+# Load sliding window data
+X, y, run_ids, window_starts, metadata = load_and_prepare_4x56_data()
+print(f"Loaded {X.shape[0]} windows from {len(np.unique(run_ids))} runs")
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Reshape for CNN (add channel dimension)
+X_train_cnn = X_train.reshape(X_train.shape[0], 4, 56, 1)
+X_test_cnn = X_test.reshape(X_test.shape[0], 4, 56, 1)
+
+# Create and train CNN model
+model = create_cnn_model(input_shape=(4, 56, 1))
+model.fit(X_train_cnn, y_train, validation_data=(X_test_cnn, y_test), epochs=100)
+```
+
+## Quick Start
+
+**Option 1: Use the flattened approach (traditional ML)**
+```bash
+python demo_ml_usage.py
+```
+
+**Option 2: Use the 4x56 CNN approach with sliding windows**
+```bash
+python cnn_4x56_model.py
+```
+
+**Option 3: Compare both approaches**
+```bash
+python compare_approaches.py
+```
+
+**Run tests**
+```bash
+python test_cnn_4x56.py
 ```

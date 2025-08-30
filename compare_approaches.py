@@ -23,16 +23,17 @@ def load_flattened_data():
     """Load data in the original flattened format (similar to training_data.csv approach)."""
     print("📥 Loading data for flattened approach...")
     
-    # Load the 4x56 data first
-    X_4x56, y, run_ids, metadata = load_and_prepare_4x56_data()
+    # Load the 4x56 sliding window data first
+    X_4x56, y, run_ids, window_starts, metadata = load_and_prepare_4x56_data()
     
-    # Flatten each run's 4x56 array into a 1D vector of 224 features
-    X_flattened = X_4x56.reshape(X_4x56.shape[0], -1)  # Shape: (runs, 224)
+    # Flatten each window's 4x56 array into a 1D vector of 224 features
+    X_flattened = X_4x56.reshape(X_4x56.shape[0], -1)  # Shape: (windows, 224)
     
     print(f"   Flattened shape: {X_flattened.shape}")
     print(f"   Features: 4 variables × 56 days = {X_flattened.shape[1]} features")
+    print(f"   Total windows: {X_flattened.shape[0]} (sliding window approach)")
     
-    return X_flattened, y, run_ids, metadata
+    return X_flattened, y, run_ids, window_starts, metadata
 
 def train_flattened_model(X_train, X_test, y_train, y_test):
     """Train a Random Forest model on flattened features."""
@@ -99,19 +100,22 @@ def train_cnn_model_simple(X_train, X_test, y_train, y_test):
     return y_pred, model
 
 def compare_approaches():
-    """Compare the flattened approach vs 4x56 CNN approach."""
-    print("🔄 Comparison: Flattened vs 4x56 CNN Approaches")
-    print("="*60)
+    """Compare the flattened approach vs 4x56 CNN approach with sliding windows."""
+    print("🔄 Comparison: Flattened vs 4x56 CNN Approaches (Sliding Windows)")
+    print("="*70)
     
     # Load data in both formats
-    X_4x56, y, run_ids, metadata = load_and_prepare_4x56_data()
-    X_flattened, _, _, _ = load_flattened_data()
+    X_4x56, y, run_ids, window_starts, metadata = load_and_prepare_4x56_data()
+    X_flattened, _, _, _, _ = load_flattened_data()
     
     print(f"\n📊 Data Summary:")
-    print(f"   Number of runs: {len(run_ids)}")
+    print(f"   Number of unique runs: {len(np.unique(run_ids))}")
+    print(f"   Total windows: {len(run_ids)} (sliding window approach)")
+    print(f"   Windows per run: {metadata.get('windows_per_run', 'unknown')}")
     print(f"   Target variables: {metadata['target_names']}")
     print(f"   Time series variables: {metadata['variable_names']}")
-    print(f"   Time range: days 100-155 (56 days)")
+    print(f"   Window size: 56 time points")
+    print(f"   Window range: {metadata.get('window_range', 'unknown')}")
     
     # Split data
     print(f"\n📊 Data Split:")
@@ -125,16 +129,17 @@ def compare_approaches():
     # 4x56 data splits
     X_4x56_train, X_4x56_test = X_4x56[train_idx], X_4x56[test_idx]
     
-    print(f"   Training: {len(train_idx)} runs")
-    print(f"   Testing: {len(test_idx)} runs")
+    print(f"   Training: {len(train_idx)} windows")
+    print(f"   Testing: {len(test_idx)} windows")
     
     # Approach 1: Flattened features with Random Forest
     print(f"\n" + "="*60)
     print("APPROACH 1: FLATTENED FEATURES")
     print("="*60)
-    print(f"Data representation: Each run as 1D vector of {X_flattened.shape[1]} features")
+    print(f"Data representation: Each window as 1D vector of {X_flattened.shape[1]} features")
     print(f"Model: Random Forest Regressor")
     print(f"Features: Variables flattened across time [var1_day100, var1_day101, ..., var4_day155]")
+    print(f"Training samples: {len(train_idx)} sliding windows")
     
     y_pred_flat, rf_model = train_flattened_model(X_flat_train, X_flat_test, y_train, y_test)
     
@@ -142,9 +147,10 @@ def compare_approaches():
     print(f"\n" + "="*60)
     print("APPROACH 2: 4x56 ARRAYS WITH CNN")
     print("="*60)
-    print(f"Data representation: Each run as 4x56 array (variables × time)")
+    print(f"Data representation: Each window as 4x56 array (variables × time)")
     print(f"Model: Convolutional Neural Network")
     print(f"Features: 2D arrays preserving variable-time structure")
+    print(f"Training samples: {len(train_idx)} sliding windows")
     
     y_pred_cnn, cnn_model = train_cnn_model_simple(X_4x56_train, X_4x56_test, y_train, y_test)
     
@@ -197,17 +203,24 @@ def compare_approaches():
     print("  ✗ Loses temporal structure information")
     print("  ✗ No spatial relationships between variables")
     
-    print("\nAPPROACH 2 - 4x56 CNN Arrays:")
+    print("\nAPPROACH 2 - 4x56 CNN Arrays with Sliding Windows:")
     print("  ✓ Preserves temporal structure") 
     print("  ✓ Captures spatial relationships between variables")
     print("  ✓ Can learn complex patterns across time and variables")
     print("  ✓ More suitable for chronologically dependent data")
+    print("  ✓ Sliding windows provide much more training data")
+    print(f"  ✓ {metadata.get('total_windows', 'Many')} training examples from {len(np.unique(run_ids))} runs")
     print("  ✗ More complex model architecture")
     print("  ✗ Requires more careful hyperparameter tuning")
     
     print(f"\n🎯 Both approaches are now available in the repository!")
     print(f"   • Use flattened approach: generate_training_data.py + demo_ml_usage.py")
-    print(f"   • Use 4x56 CNN approach: cnn_4x56_model.py")
+    print(f"   • Use 4x56 CNN sliding window approach: cnn_4x56_model.py")
+    print(f"   • Compare both approaches: compare_approaches.py")
+    print(f"\n📈 Sliding Window Benefits:")
+    print(f"   • Multiple 56-length sequences per run (100-155, 101-156, etc.)")
+    print(f"   • Significantly more training examples: {metadata.get('total_windows', 'N/A')} vs {len(np.unique(run_ids))}")
+    print(f"   • Better utilization of available time series data")
 
 if __name__ == "__main__":
     compare_approaches()

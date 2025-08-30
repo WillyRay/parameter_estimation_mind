@@ -21,15 +21,19 @@ warnings.filterwarnings('ignore')
 
 def load_and_prepare_4x56_data():
     """
-    Load the reshaped data and truncate to 4x56 arrays (days 100-155).
+    Load the reshaped data and create sliding windows of 4x56 arrays.
+    
+    Each sliding window represents 56 consecutive time points starting from tick 100.
+    For each run, multiple windows are created: 100-155, 101-156, 102-157, etc.
     
     Returns:
-        X: Array of shape (num_runs, 4, 56) containing time series data
-        y: Array of shape (num_runs, 2) containing target variables
-        run_ids: Array of run identifiers
+        X: Array of shape (num_windows, 4, 56) containing time series data
+        y: Array of shape (num_windows, 2) containing target variables  
+        run_ids: Array of run identifiers for each window
+        window_starts: Array of starting tick for each window
         metadata: Dictionary with variable names and other info
     """
-    print("📥 Loading reshaped data...")
+    print("📥 Loading reshaped data and creating sliding windows...")
     
     # Load the saved data
     time_series_list = np.load('data/time_series_by_run.npy', allow_pickle=True)
@@ -41,35 +45,70 @@ def load_and_prepare_4x56_data():
     print(f"   Variable names: {metadata['variable_names']}")
     print(f"   Target variables: {metadata['target_names']}")
     
-    # The original data starts at tick 90, so:
-    # - tick 90 = index 0
-    # - tick 100 = index 10  
-    # - tick 155 = index 65
-    # We want days 100-155 (56 days total)
-    start_day_index = 10  # tick 100
-    end_day_index = 66    # tick 155 + 1 (exclusive)
+    # Time series mapping: tick 90 = index 0, tick 100 = index 10, etc.
+    # Each time series has 276 time points (ticks 90-365)
+    window_size = 56
+    start_tick = 100
+    tick_start_in_data = 90  # First tick in the time series data
     
-    print(f"   Truncating to days 100-155 (indices {start_day_index}:{end_day_index})")
+    # Calculate the range of possible starting positions
+    # tick 100 = index 10, last possible start for 56-window = tick 310 = index 220
+    start_index = start_tick - tick_start_in_data  # 100 - 90 = 10
+    max_data_index = time_series_list[0].shape[1] - 1  # 275 (for tick 365)
+    last_start_index = max_data_index - window_size + 1  # 275 - 56 + 1 = 220
     
-    # Truncate all time series to 4x56
-    truncated_time_series = []
-    for ts in time_series_list:
-        truncated_ts = ts[:, start_day_index:end_day_index]  # Shape: (4, 56)
-        truncated_time_series.append(truncated_ts)
+    last_start_tick = tick_start_in_data + last_start_index  # 90 + 220 = 310
+    num_windows_per_run = last_start_index - start_index + 1  # 220 - 10 + 1 = 211
     
-    # Convert to numpy array
-    X = np.stack(truncated_time_series)  # Shape: (num_runs, 4, 56)
-    y = targets  # Shape: (num_runs, 2)
+    print(f"   Creating sliding windows:")
+    print(f"   - Window size: {window_size} time points")
+    print(f"   - First window: ticks {start_tick}-{start_tick + window_size - 1}")
+    print(f"   - Last window: ticks {last_start_tick}-{last_start_tick + window_size - 1}")
+    print(f"   - Windows per run: {num_windows_per_run}")
+    print(f"   - Total windows: {len(time_series_list) * num_windows_per_run}")
+    
+    # Create sliding windows
+    all_windows = []
+    all_targets = []
+    all_run_ids = []
+    all_window_starts = []
+    
+    for run_idx, (ts, target, run_id) in enumerate(zip(time_series_list, targets, run_ids)):
+        for window_idx in range(num_windows_per_run):
+            window_start_index = start_index + window_idx
+            window_end_index = window_start_index + window_size
+            
+            # Extract the 4x56 window
+            window_data = ts[:, window_start_index:window_end_index]  # Shape: (4, 56)
+            
+            # Calculate the actual tick for this window start
+            window_start_tick = tick_start_in_data + window_start_index
+            
+            all_windows.append(window_data)
+            all_targets.append(target)  # Same target for all windows from this run
+            all_run_ids.append(run_id)
+            all_window_starts.append(window_start_tick)
+    
+    # Convert to numpy arrays
+    X = np.stack(all_windows)  # Shape: (total_windows, 4, 56)
+    y = np.stack(all_targets)  # Shape: (total_windows, 2)
+    run_ids_array = np.array(all_run_ids)
+    window_starts_array = np.array(all_window_starts)
     
     print(f"   Final X shape: {X.shape}")
     print(f"   Final y shape: {y.shape}")
+    print(f"   Run IDs shape: {run_ids_array.shape}")
+    print(f"   Window starts shape: {window_starts_array.shape}")
     
     # Update metadata
     metadata_4x56 = metadata.copy()
-    metadata_4x56['time_points'] = 56
-    metadata_4x56['day_range'] = '100-155'
+    metadata_4x56['time_points'] = window_size
+    metadata_4x56['window_range'] = f'{start_tick}-{start_tick + window_size - 1}'
+    metadata_4x56['windows_per_run'] = num_windows_per_run
+    metadata_4x56['total_windows'] = len(all_windows)
+    metadata_4x56['sliding_windows'] = True
     
-    return X, y, run_ids, metadata_4x56
+    return X, y, run_ids_array, window_starts_array, metadata_4x56
 
 def create_cnn_model(input_shape=(4, 56, 1), learning_rate=0.001):
     """
@@ -175,16 +214,16 @@ def train_and_evaluate_cnn():
     print("="*60)
     
     # Load and prepare data
-    X, y, run_ids, metadata = load_and_prepare_4x56_data()
+    X, y, run_ids, window_starts, metadata = load_and_prepare_4x56_data()
     
     # Split data
     print("\n📊 Splitting data (80% train, 20% test)...")
-    X_train, X_test, y_train, y_test, run_ids_train, run_ids_test = train_test_split(
-        X, y, run_ids, test_size=0.2, random_state=42
+    X_train, X_test, y_train, y_test, run_ids_train, run_ids_test, window_starts_train, window_starts_test = train_test_split(
+        X, y, run_ids, window_starts, test_size=0.2, random_state=42
     )
     
-    print(f"   Training set: {X_train.shape[0]} runs")
-    print(f"   Test set: {X_test.shape[0]} runs")
+    print(f"   Training set: {X_train.shape[0]} windows")
+    print(f"   Test set: {X_test.shape[0]} windows")
     
     # Normalize data
     X_train_norm, X_test_norm, scalers = normalize_data(X_train, X_test)
@@ -251,14 +290,15 @@ def train_and_evaluate_cnn():
     
     # Show sample predictions
     print("\n🔍 Sample Predictions:")
-    print("-" * 40)
-    print("Run ID | Actual [decay, surface] | Predicted [decay, surface]")
-    print("-" * 65)
+    print("-" * 70)
+    print("Run ID | Window Start | Actual [decay, surface] | Predicted [decay, surface]")
+    print("-" * 70)
     for i in range(min(5, len(y_test))):
         run_id = run_ids_test[i]
+        window_start = window_starts_test[i]
         actual = f"[{y_test[i, 0]:.4f}, {y_test[i, 1]:.4f}]"
         predicted = f"[{y_pred[i, 0]:.4f}, {y_pred[i, 1]:.4f}]"
-        print(f"{run_id:6d} | {actual:23s} | {predicted}")
+        print(f"{run_id:6d} | {window_start:12.0f} | {actual:23s} | {predicted}")
     
     # Training history
     print(f"\n📉 Training Summary:")
@@ -270,7 +310,10 @@ def train_and_evaluate_cnn():
     print(f"   Best validation loss: {min(history.history['val_loss']):.6f}")
     
     print(f"\n✅ CNN training completed!")
-    print(f"\nℹ️  This demonstrates how 4x56 time series arrays can be used with:")
+    print(f"\nℹ️  This demonstrates sliding window approach with 4x56 time series arrays:")
+    print(f"   • Creates {metadata['windows_per_run']} windows per run")
+    print(f"   • Total dataset: {metadata['total_windows']} training examples")
+    print(f"   • Each window: {metadata['window_range']} time points")
     print(f"   • 2D Convolutional layers to capture spatial patterns")
     print(f"   • MaxPooling to reduce dimensionality") 
     print(f"   • BatchNormalization for stable training")
